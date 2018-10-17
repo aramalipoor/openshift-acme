@@ -44,6 +44,7 @@ const (
 	Flag_ExposerIP                   = "exposer-ip"
 	Flag_ExposerPort                 = "exposer-port"
 	Flag_ExposerListenIP             = "exposer-listen-ip"
+	Flag_AdditionalLabels            = "additional-labels"
 	Flag_Namespace_Key               = "namespace"
 	Flag_AccountName_Key             = "account-name"
 	Flag_DefaultRouteTermination_Key = "default-route-termination"
@@ -94,6 +95,7 @@ func NewOpenShiftAcmeCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	rootCmd.PersistentFlags().StringP(Flag_ExposerIP, "", "", "IP address on which this controller can be reached inside the cluster.")
 	rootCmd.PersistentFlags().Int32P(Flag_ExposerPort, "", 5000, "Port for http-01 server")
 	rootCmd.PersistentFlags().StringP(Flag_ExposerListenIP, "", "0.0.0.0", "Listen address for http-01 server")
+	rootCmd.PersistentFlags().StringArrayP(Flag_AdditionalLabels, "", []string{},"Additional labels to apply to temporary route")
 	rootCmd.PersistentFlags().StringP(Flag_SelfNamespace_Key, "", "", "Namespace where this controller and associated objects are deployed to. Defaults to current namespace if this program is running inside of the cluster.")
 	rootCmd.PersistentFlags().StringP(Flag_DefaultRouteTermination_Key, "", string(routev1.InsecureEdgeTerminationPolicyRedirect), "Default TLS termination of the route.")
 
@@ -243,6 +245,8 @@ func RunServer(v *viper.Viper, cmd *cobra.Command, out io.Writer) error {
 		}
 	}
 
+	additionalLabels := v.GetStringMapString(Flag_AdditionalLabels)
+
 	defaultRouteTermination := routev1.InsecureEdgeTerminationPolicyType(v.GetString(Flag_DefaultRouteTermination_Key))
 	switch defaultRouteTermination {
 	case routev1.InsecureEdgeTerminationPolicyRedirect,
@@ -278,7 +282,7 @@ func RunServer(v *viper.Viper, cmd *cobra.Command, out io.Writer) error {
 	secretLister := kcorelistersv1.NewSecretLister(secretInformer.GetIndexer())
 	acmeClientFactory := acmeclientbuilder.NewSharedClientFactory(acmeUrl, accountName, selfNamespace, kubeClientset, secretLister)
 
-	rc := routecontroller.NewRouteController(acmeClientFactory, exposers, routeClientset, kubeClientset, routeInformer, secretInformer, exposerIP, int32(exposerPort), selfNamespace, selfSelector, defaultRouteTermination)
+	rc := routecontroller.NewRouteController(acmeClientFactory, exposers, routeClientset, kubeClientset, routeInformer, secretInformer, exposerIP, int32(exposerPort), additionalLabels, selfNamespace, selfSelector, defaultRouteTermination)
 	go rc.Run(Workers, stopCh)
 
 	<-stopCh

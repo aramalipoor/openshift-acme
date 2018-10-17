@@ -88,6 +88,7 @@ type RouteController struct {
 
 	exposerIP     string
 	exposerPort   int32
+	additionalLabels map[string]string
 	selfNamespace string
 	selfSelector  map[string]string
 
@@ -103,6 +104,7 @@ func NewRouteController(
 	secretInformer cache.SharedIndexInformer,
 	exposerIP string,
 	exposerPort int32,
+	additionalLabels map[string]string,
 	selfNamespace string,
 	selfSelector map[string]string,
 	defaultRouteTermination routev1.InsecureEdgeTerminationPolicyType,
@@ -137,6 +139,7 @@ func NewRouteController(
 
 		exposerIP:     exposerIP,
 		exposerPort:   exposerPort,
+		additionalLabels: additionalLabels,
 		selfNamespace: selfNamespace,
 		selfSelector:  selfSelector,
 
@@ -366,7 +369,7 @@ func (rc *RouteController) wrapExposers(exposers map[string]challengeexposers.In
 
 	for k, v := range exposers {
 		if k == "http-01" {
-			wrapped[k] = NewExposer(v, rc.routeClientset, rc.kubeClientset, rc.recorder, rc.exposerIP, rc.exposerPort, rc.selfNamespace, rc.selfSelector, route)
+			wrapped[k] = NewExposer(v, rc.routeClientset, rc.kubeClientset, rc.recorder, rc.exposerIP, rc.exposerPort, rc.additionalLabels, rc.selfNamespace, rc.selfSelector, route)
 		} else {
 			wrapped[k] = v
 		}

@@ -54,6 +54,7 @@ type Exposer struct {
 	recorder          record.EventRecorder
 	exposerIP         string
 	exposerPort       int32
+	additionalLabels  map[string]string
 	selfNamespace     string
 	selfSelector      map[string]string
 	route             *routev1.Route
@@ -67,6 +68,7 @@ func NewExposer(underlyingExposer challengeexposers.Interface,
 	recorder record.EventRecorder,
 	exposerIP string,
 	exposerPort int32,
+	additionalLabels map[string]string,
 	selfNamespace string,
 	selfSelector map[string]string,
 	route *routev1.Route,
@@ -78,6 +80,7 @@ func NewExposer(underlyingExposer challengeexposers.Interface,
 		recorder:          recorder,
 		exposerIP:         exposerIP,
 		exposerPort:       exposerPort,
+		additionalLabels:  additionalLabels,
 		selfNamespace:     selfNamespace,
 		selfSelector:      selfSelector,
 		route:             route,
@@ -158,9 +161,13 @@ func (e *Exposer) Expose(c *acme.Client, domain string, token string) error {
 
 	exposerName := createTemporaryExposerName(e.route.Name)
 
-	labels := map[string]string{
+	routeLabels := map[string]string{
 		api.ExposerLabelName:    "true",
 		api.ExposerForLabelName: string(e.route.UID),
+	}
+
+	for k, v := range e.additionalLabels {
+		routeLabels[k] = v
 	}
 
 	// Route can only point to a Service in the same namespace
@@ -185,7 +192,7 @@ func (e *Exposer) Expose(c *acme.Client, domain string, token string) error {
 					Controller: &trueVal,
 				},
 			},
-			Labels: labels,
+			Labels: routeLabels,
 		},
 		Spec: routev1.RouteSpec{
 			Host: domain,
@@ -224,7 +231,7 @@ func (e *Exposer) Expose(c *acme.Client, domain string, token string) error {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            exposerName,
 			OwnerReferences: []metav1.OwnerReference{ownerRefToExposingRoute},
-			Labels:          labels,
+			Labels:          routeLabels,
 		},
 		Spec: corev1.ServiceSpec{
 			Type:      corev1.ServiceTypeClusterIP,
@@ -265,7 +272,7 @@ func (e *Exposer) Expose(c *acme.Client, domain string, token string) error {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:            service.Name,
 				OwnerReferences: []metav1.OwnerReference{ownerRefToExposingRoute},
-				Labels:          labels,
+				Labels:          routeLabels,
 			},
 			Subsets: []corev1.EndpointSubset{
 				{
